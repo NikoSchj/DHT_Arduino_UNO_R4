@@ -133,9 +133,10 @@ void loop() {
     DHTdata reading{};
     const DHTstatus status = readDHT(reading);
 
+    // Tjek
     Serial.print("Ren: ");
     for (uint8_t i = 0; i < 5; i++) {
-        printBinary(reading.raw[i]);
+        printBinary_tjek(reading.ren[i]);
         Serial.print(' ');
     }
     Serial.print(" -> ");
