@@ -23,10 +23,10 @@ static const char *status (DHTstatus s) {
     switch (s) {
         case DHTstatus::OK: return "OK";
         case DHTstatus::NoResponse: return "Ingen respons (tjek pins)";
-        case DHTstatus::BitTimeout: return "Timeout imens a der blev laest bits";
+        case DHTstatus::BitTimeout: return "Timeout imens a der blev laest bits";  // Den tog længere tid om at udføre arbejdet end forventet
         case DHTstatus::ChecksumError: return "Der er korrupte data";
     }
-    return "ukendt";
+    return "ukendt"; // Bliver aldrig printet, så længe s
 }
 
 // Struct der indeholder data fra DHT11 sensor
@@ -46,7 +46,7 @@ static int maalNieavu(uint8_t level, uint32_t timeoutUs) {
     return (int)(micros() - start); // her konvertere jeg unsigneded int til signed int
 }
 
-DHTstatus readDHT(DHTdata &out) {
+DHTstatus laesDHT(DHTdata &out) {
     uint8_t data[5] = {0, 0, 0, 0, 0};
 
     // Start signalet
@@ -87,11 +87,13 @@ DHTstatus readDHT(DHTdata &out) {
 
     if (sum != data[4]) return DHTstatus::ChecksumError; // Der er fejl i data
 
+    // Find fugtigheden og lig det ind i structen
     uint8_t fugt    = data[0]; // heltalsdel
     uint8_t fugtDec = data[1]; // decimaldel
 
     out.Fugtighed = fugt + fugtDec / 10.0f;
 
+    // Find temperatur og lig det ind i structen
     uint8_t temp    = data[2];          // heltalsdel
     uint8_t tempDec = data[3] & 0x7F;   // decimaldel, uden fortegnsbitten
 
@@ -123,15 +125,15 @@ void setup() {
 }
 
 void loop() {
-    static uint32_t sidst_læst = 0;
+    static uint32_t sidst_laest = 0;
 
-    if (millis() - sidst_læst < READ_INTERVAL_MS) {
+    if (millis() - sidst_laest < READ_INTERVAL_MS) {
         return;
     }
     sidst_læst = millis();
 
     DHTdata reading{};
-    const DHTstatus status = readDHT(reading);
+    const DHTstatus status = laesDHT(reading);
 
     // Tjek
     Serial.print("Ren: ");
