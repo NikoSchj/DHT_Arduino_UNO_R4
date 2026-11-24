@@ -6,10 +6,15 @@
 #include <Arduino_LED_Matrix.h>
 #include <ArduinoGraphics.h>
 
-
-const uint8_t DHT_PIN = 7;                // 'Data' eller 'sig' på DHT. DHT11's DATA-pin er forbundet til D7
+const int DHT_PIN = 7;                // 'Data' eller 'sig' på DHT. DHT11's DATA-pin er forbundet til D7
 const uint32_t LAES_INTERVAL_MS = 2000;   // DHT11: max omkring 1 læsning pr sekund, står i databladet
-const int BIT_THRESHOLD_MCS = 40;         // HIGH længere end den = bit 1
+const uint8_t BIT_THRESHOLD_MCS = 40;         // HIGH længere end den = bit 1
+const int KNAP_PIN = 8;                   // Pinnen til knappen
+volatile bool visTemp = true;            // Til knappens stadie
+
+void knapValg() {
+    visTemp = !visTemp;
+}
 
 // Værdierne inde i enum gemmes som unsigned int af 8 bits, dvs hver fylder en byte og bliver numeret som {0, 1, 2, 3}
 enum class DHTstatus : uint8_t  {
@@ -32,7 +37,7 @@ static const char *status (DHTstatus s) {
 
 // Struct der indeholder data fra DHT11 sensor
 struct DHTdata {
-    uint8_t ren[5];         // de 5 rene bytes, til testing
+    uint8_t bytes[5];
     float Fugtighed;        // %RH, betyder Relative Humidity
     float Temperatur;       // Grader i celcius
 };
@@ -50,7 +55,7 @@ static int maalNieavu(bool level, uint32_t timeoutMcs) {
     return (int)(micros() - start); // konverterer uint32_t (unsigned) til int (signed), så den kan returnere -1 ved fejl
 }
 
-
+// funktionen der køre
 static DHTstatus laesDHT(DHTdata &out) {
     uint8_t data[5] = {0, 0, 0, 0, 0};
 
@@ -61,17 +66,27 @@ static DHTstatus laesDHT(DHTdata &out) {
     pinMode(DHT_PIN, INPUT_PULLUP);   // INPUT_PULLUP tager den tilbage til HIGH
 
     // Sensor respons, (venter ca 20-40 mikro sekunder HIGH) -> 80 mikro sekunder LOW -> 80 mikro sekunder HIGH
-    if (maalNieavu(HIGH, 100) < 0) return DHTstatus::NoResponse; // vent på at sensoren trækker linjen LOW
-    if (maalNieavu(LOW,  100) < 0) return DHTstatus::NoResponse; // sensorens 80 mikro sekunder LOW-svar
-    if (maalNieavu(HIGH, 100) < 0) return DHTstatus::NoResponse; // sensorens 80 mikro sekunder HIGH-svar
+    if (maalNieavu(HIGH, 100) < 0) {
+        return DHTstatus::NoResponse; // vent på at sensoren trækker linjen LOW
+    }
+    if (maalNieavu(LOW,  100) < 0) {
+        return DHTstatus::NoResponse; // sensorens 80 mikro sekunder LOW-svar
+    }
+    if (maalNieavu(HIGH, 100) < 0) {
+        return DHTstatus::NoResponse; // sensorens 80 mikro sekunder HIGH-svar
+    }
 
     // læs 40 bits
     for (uint8_t i = 0; i < 40; i++) {
-        if (maalNieavu(LOW, 80) < 0) return DHTstatus::BitTimeout;  // Timedout
+        if (maalNieavu(LOW, 80) < 0) {
+            return DHTstatus::BitTimeout;  // Timedout
+        }
 
 
         const int highTid = maalNieavu(HIGH, 100);
-        if (highTid < 0) return DHTstatus::BitTimeout;                           // Timedout
+        if (highTid < 0) {
+            return DHTstatus::BitTimeout; // Timedout
+        }
 
         // Tjekker, om den målte tid for den høje puls (highTid) er længere end en fastsat grænseværdi i mikrosekunder (BIT_THRESHOLD_US)
         // uint8_t er samme størelse som 1 byte eller 8 bit, hvilket er det jeg for svaret i fra måleren
@@ -82,7 +97,7 @@ static DHTstatus laesDHT(DHTdata &out) {
             bit = false;
         }
 
-        // Her laver jeg
+        // Her laver jeg en bitmaske og rykker en bit i data et hak til venstre
         data[i / 8] <<= 1;
         data[i / 8] |= bit; // jeg rykker alle bits i currentbyte 1 bit til venstre og tænder for den sidste bit, hvis biten er 0 forbliver den 0
     }
@@ -91,7 +106,7 @@ static DHTstatus laesDHT(DHTdata &out) {
     const uint16_t sum = (uint8_t)(data[0] + data[1] + data[2] + data[3]);
 
     for (uint8_t i = 0; i < 5; i++) {
-        out.ren[i] = data[i];
+        out.bytes[i] = data[i];
     }
 
     /* Datasheetet for DHT11 beskriver at dataene bliver givet som en heltals og en decimal del
@@ -120,10 +135,10 @@ static DHTstatus laesDHT(DHTdata &out) {
     return DHTstatus::OK;
 }
 
-// for at tjekke resultatet
-static void printBinary_tjek(uint8_t value) {
-    for (int8_t bit = 7; bit >= 0; bit--) {
-        Serial.print((value >> bit) & 0x01);
+// For at tjekke resultatet fra sensoren
+void printBinary_tjek(uint8_t value) {
+    for (int8_t bit = 7; bit >= 0; bit--) {  
+        Serial.print((value >> bit) &0x01); // Print værdien (0/1) af bit nr. 'bit' i value
     }
 }
 
@@ -132,8 +147,11 @@ void setup() {
     while (!Serial && millis() < 5000) {
         // vent i op til 5 sekunder på serial forbindelse
     }
-    pinMode(DHT_PIN, INPUT_PULLUP); // Den digitale pin der går til 
-    delay(1000);   // DHT11 har brug for 1 sek efter start up før den kan læse
+    pinMode(KNAP_PIN, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(KNAP_PIN), knapValg, FALLING);
+    // DHT11 sensor start up
+    pinMode(DHT_PIN, INPUT_PULLUP);
+    delay(1000);   // sensor har brug for 1 sek efter start up før den kan læse
     Serial.println("DHT11 startede");
 }
 
@@ -149,28 +167,30 @@ void loop() {
     const DHTstatus laestStatus = laesDHT(reading);
 
     // Tjek
-    Serial.println("Ren: ");
+    Serial.println("Bits: ");
     for (uint8_t i = 0; i < 5; i++) {
-        printBinary_tjek(reading.ren[i]);
+        printBinary_tjek(reading.bytes[i]);
         Serial.print(' ');
     }
     Serial.println(" -> ");
 
-    // Læser status for DHT11, hvis dens status ikke er OK printer den status for at fortælle hvad der er forkert
+    // Læser status for sensoren, hvis dens status ikke er OK printer den status for at fortælle hvad der er forkert
     if (laestStatus != DHTstatus::OK) {
         Serial.print(status(laestStatus));
         return;
     }
 
-    // find temperaturen
-    Serial.print("Temperatur: ");
-    Serial.print(reading.Temperatur);
-    Serial.print(" C\r\n");
-
-    //En DHT11 måler luftfugtighed ved at registrere ændringer i den elektriske modstand i et fugtabsorberende materiale
-    // find luftfugtighede
-    Serial.print("Fugtighed: ");
-    Serial.print(reading.Fugtighed);
-    Serial.print(" %RH\r\n"); // RH står for relative humidity, og måler procent af vanddamp i luften
+    if (visTemp) {
+        // find temperaturen
+        Serial.print("Temperatur: ");
+        Serial.print(reading.Temperatur);
+        Serial.print(" C\r\n");
+    } else {
+        //En DHT11 måler luftfugtighed ved at registrere ændringer i den elektriske modstand i et fugtabsorberende materiale
+        // find luftfugtighede
+        Serial.print("Fugtighed: ");
+        Serial.print(reading.Fugtighed);
+        Serial.print(" %RH\r\n"); // RH står for relative humidity, og måler procent af vanddamp i luften
+    }
 
 }
