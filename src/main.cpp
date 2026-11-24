@@ -47,8 +47,9 @@ static int maalNieavu(bool level, uint32_t timeoutMcs) {
             return -1;
         }
     }
-    return (int)(micros() - start); // konverterer uint32_t (unsigned) til int (signed), så funktionen kan returnere -1 ved fejl
+    return (int)(micros() - start); // konverterer uint32_t (unsigned) til int (signed), så den kan returnere -1 ved fejl
 }
+
 
 static DHTstatus laesDHT(DHTdata &out) {
     uint8_t data[5] = {0, 0, 0, 0, 0};
@@ -61,7 +62,7 @@ static DHTstatus laesDHT(DHTdata &out) {
 
     // Sensor respons, (venter ca 20-40 mikro sekunder HIGH) -> 80 mikro sekunder LOW -> 80 mikro sekunder HIGH
     if (maalNieavu(HIGH, 100) < 0) return DHTstatus::NoResponse; // vent på at sensoren trækker linjen LOW
-    if (maalNieavu(LOW,  100) < 0) return DHTstatus::NoResponse; // sensorens 80 mikro ssekunder LOW-svar
+    if (maalNieavu(LOW,  100) < 0) return DHTstatus::NoResponse; // sensorens 80 mikro sekunder LOW-svar
     if (maalNieavu(HIGH, 100) < 0) return DHTstatus::NoResponse; // sensorens 80 mikro sekunder HIGH-svar
 
     // læs 40 bits
@@ -73,6 +74,7 @@ static DHTstatus laesDHT(DHTdata &out) {
         if (highTid < 0) return DHTstatus::BitTimeout;                           // Timedout
 
         // Tjekker, om den målte tid for den høje puls (highTid) er længere end en fastsat grænseværdi i mikrosekunder (BIT_THRESHOLD_US)
+        // uint8_t er samme størelse som 1 byte eller 8 bit, hvilket er det jeg for svaret i fra måleren
         uint8_t bit;
         if (highTid > BIT_THRESHOLD_MCS) {
             bit = true;
@@ -80,6 +82,7 @@ static DHTstatus laesDHT(DHTdata &out) {
             bit = false;
         }
 
+        // Her laver jeg
         data[i / 8] <<= 1;
         data[i / 8] |= bit; // jeg rykker alle bits i currentbyte 1 bit til venstre og tænder for den sidste bit, hvis biten er 0 forbliver den 0
     }
@@ -129,7 +132,7 @@ void setup() {
     while (!Serial && millis() < 5000) {
         // vent i op til 5 sekunder på serial forbindelse
     }
-    pinMode(DHT_PIN, INPUT_PULLUP);
+    pinMode(DHT_PIN, INPUT_PULLUP); // Den digitale pin der går til 
     delay(1000);   // DHT11 har brug for 1 sek efter start up før den kan læse
     Serial.println("DHT11 startede");
 }
@@ -149,7 +152,7 @@ void loop() {
     Serial.println("Ren: ");
     for (uint8_t i = 0; i < 5; i++) {
         printBinary_tjek(reading.ren[i]);
-        Serial.println(' '); // Starter en ny linje
+        Serial.print(' ');
     }
     Serial.println(" -> ");
 
