@@ -26,7 +26,7 @@ enum class DHTstatus {
     OK,              // Sensoren køre fint
     NoResponse,      // sensoren svarede aldrig start signalet
     BitTimeout,      // sensoren stoppede i mens den sendte bits
-    ChecksumError    // alle bits modtaget but dataen er korrupt
+    ChecksumError    // alle bits modtaget men dataen er korrupt
 };
 
 // Switch case statement til status af DHT11 sensoren
@@ -65,7 +65,7 @@ static int maalPulsTid(bool level, uint32_t timeoutMcs) {
     return (int)(micros() - start);
 }
 
-// funktionen der køre
+// Funktionen der køre DHT11 sensoren
 static DHTstatus laesDHT(DHTdata &out) {
     uint8_t data[5] = {0, 0, 0, 0, 0};
 
@@ -115,7 +115,7 @@ static DHTstatus laesDHT(DHTdata &out) {
     }
 
     // I datasheetet står der hvordan den giver data temp, humidity og cheksum data
-    const uint16_t sum = (uint8_t)(data[0] + data[1] + data[2] + data[3]);
+    const uint8_t sum = (uint8_t)(data[0] + data[1] + data[2] + data[3]);
 
     for (uint8_t i = 0; i < 5; i++) {
         out.bytes[i] = data[i];
@@ -184,7 +184,7 @@ void loop() {
     const DHTstatus laestStatus = laesDHT(reading);
 
     // Tjek
-    Serial.println("Bits: ");
+    Serial.print("Bits: ");
     for (uint8_t i = 0; i < 5; i++) {
         printBinary_tjek(reading.bytes[i]);
         Serial.print(' ');
@@ -193,7 +193,7 @@ void loop() {
 
     // Læser status for sensoren, hvis dens status ikke er OK printer den status for at fortælle hvad der er forkert
     if (laestStatus != DHTstatus::OK) {
-        Serial.print(status(laestStatus));
+        Serial.println(status(laestStatus));
         return;
     }
 
