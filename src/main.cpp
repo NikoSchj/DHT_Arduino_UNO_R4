@@ -8,12 +8,17 @@
 
 const int DHT_PIN = 7;                // 'Data' eller 'sig' på DHT. DHT11's DATA-pin er forbundet til D7
 const uint32_t LAES_INTERVAL_MS = 2000;   // DHT11: max omkring 1 læsning pr sekund, står i databladet
-const uint8_t BIT_THRESHOLD_MCS = 40;         // HIGH længere end den = bit 1
+const uint8_t BIT_THRESHOLD_MCS = 40;     // HIGH længere end den = bit 1
 const int KNAP_PIN = 8;                   // Pinnen til knappen
-volatile bool visTemp = true;            // Til knappens stadie
+volatile bool visTemp = true;             // Til knappens stadie
+volatile uint32_t sidstTrykket = 0;
 
 void knapValg() {
-    visTemp = !visTemp;
+    uint32_t nu = millis();
+    if (nu - sidstTrykket > 200) {
+        visTemp = !visTemp;
+        sidstTrykket = nu;
+    }
 }
 
 // Værdierne inde i enum gemmes som unsigned int af 8 bits, dvs hver fylder en byte og bliver numeret som {0, 1, 2, 3}
@@ -97,9 +102,10 @@ static DHTstatus laesDHT(DHTdata &out) {
             bit = false;
         }
 
-        // Her laver jeg en bitmaske og rykker en bit i data et hak til venstre
+        /* jeg rykker alle bits i data 1 bit til venstre og tænder for den sidste bit,
+         * hvis biten er 0 forbliver den 0 */
         data[i / 8] <<= 1;
-        data[i / 8] |= bit; // jeg rykker alle bits i currentbyte 1 bit til venstre og tænder for den sidste bit, hvis biten er 0 forbliver den 0
+        data[i / 8] |= bit;
     }
 
     // I datasheetet står der hvordan den giver data temp, humidity og cheksum data
@@ -137,7 +143,7 @@ static DHTstatus laesDHT(DHTdata &out) {
 
 // For at tjekke resultatet fra sensoren
 void printBinary_tjek(uint8_t value) {
-    for (int8_t bit = 7; bit >= 0; bit--) {  
+    for (int8_t bit = 7; bit >= 0; bit--) {
         Serial.print((value >> bit) &0x01); // Print værdien (0/1) af bit nr. 'bit' i value
     }
 }
@@ -152,7 +158,8 @@ void setup() {
     // DHT11 sensor start up
     pinMode(DHT_PIN, INPUT_PULLUP);
     delay(1000);   // sensor har brug for 1 sek efter start up før den kan læse
-    Serial.println("DHT11 startede");
+    Serial.println("DHT11 startede!");
+    Serial.println("Starter med at vise temperatur, brug knappen til at skifte mellem temperatur og fugtighed");
 }
 
 void loop() {
@@ -181,11 +188,13 @@ void loop() {
     }
 
     if (visTemp) {
+        Serial.print("Viser temperatur målinger\r\n");
         // find temperaturen
         Serial.print("Temperatur: ");
         Serial.print(reading.Temperatur);
         Serial.print(" C\r\n");
     } else {
+        Serial.print("Viser fugtigheds målinger\r\n");
         //En DHT11 måler luftfugtighed ved at registrere ændringer i den elektriske modstand i et fugtabsorberende materiale
         // find luftfugtighede
         Serial.print("Fugtighed: ");
