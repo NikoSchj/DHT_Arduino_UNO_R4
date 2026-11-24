@@ -8,11 +8,11 @@
 
 const int DHT_PIN = 7;                // 'Data' eller 'sig' på DHT. DHT11's DATA-pin er forbundet til D7
 const uint32_t LAES_INTERVAL_MS = 2000;   // DHT11: max omkring 1 læsning pr sekund, står i databladet
-const uint8_t BIT_THRESHOLD_MCS = 40;     // HIGH længere end den = bit 1
 const int KNAP_PIN = 8;                   // Pinnen til knappen
 volatile bool visTemp = true;             // Til knappens stadie
-volatile uint32_t sidstTrykket = 0;
+volatile uint32_t sidstTrykket = 0;       // Bruges til debounce
 
+// Funktion til at vælge mellem at vise temp eller fugtighed
 void knapValg() {
     uint32_t nu = millis();
     if (nu - sidstTrykket > 200) {
@@ -21,15 +21,15 @@ void knapValg() {
     }
 }
 
-// Værdierne inde i enum gemmes som unsigned int af 8 bits, dvs hver fylder en byte og bliver numeret som {0, 1, 2, 3}
-enum class DHTstatus : uint8_t  {
+// Værdierne inde i enum bliver numeret som {0, 1, 2, 3}
+enum class DHTstatus {
     OK,              // Sensoren køre fint
     NoResponse,      // sensoren svarede aldrig start signalet
     BitTimeout,      // sensoren stoppede i mens den sendte bits
     ChecksumError    // alle bits modtaget but dataen er korrupt
 };
 
-// Passer ikke så godt hvis det var variabler, men passer fordi de ikke kan ændre sig passer det godt
+// Switch case statement til status af DHT11 sensoren
 static const char *status (DHTstatus s) {
     switch (s) {
         case DHTstatus::OK : return "OK";                                         // værdien OK, som hører til DHTstatus
@@ -47,56 +47,62 @@ struct DHTdata {
     float Temperatur;       // Grader i celcius
 };
 
-// Fungere som et stopur, starter tid, og returnere hvor langtid level blev på enten high eller low
-static int maalNieavu(bool level, uint32_t timeoutMcs) {
+// Fungere som et stopur, starter tid, og returnere hvor langtid level blev på enten high eller low (timeoutMcs er en parameter for denne funktion: max ventetid i micros)
+static int maalPulsTid(bool level, uint32_t timeoutMcs) {
 
-    //
+    // Start stopur
     const uint32_t start = micros();
+
+    // Vent så længe pinnen stadig er på det målte niveau
     while (digitalRead(DHT_PIN) == level) {
-        if (micros() - start > timeoutMcs) {
+        // Hvis der er gået længere tid end timeoutMcs giver den op, timeoutMcs bliver defineret 
+        if ((micros() - start) > timeoutMcs) {
             return -1;
         }
     }
-    return (int)(micros() - start); // konverterer uint32_t (unsigned) til int (signed), så den kan returnere -1 ved fejl
+    // Pinnen har skiftet, returnér hvor lang tid det tog.
+    // Konverteres til int, så funktionen også kan returnere -1 ved fejl.
+    return (int)(micros() - start);
 }
 
 // funktionen der køre
 static DHTstatus laesDHT(DHTdata &out) {
     uint8_t data[5] = {0, 0, 0, 0, 0};
 
-    // Start signalet
-    pinMode(DHT_PIN, OUTPUT);
+    pinMode(DHT_PIN, OUTPUT);         // Sender start signal til DHT11
     digitalWrite(DHT_PIN,LOW);
-    delay(20); // Databladet til DHT11 kræver at pinen bliver holdt low i mindst 18 ms og maks 30 ms
-    pinMode(DHT_PIN, INPUT_PULLUP);   // INPUT_PULLUP tager den tilbage til HIGH
-
-    // Sensor respons, (venter ca 20-40 mikro sekunder HIGH) -> 80 mikro sekunder LOW -> 80 mikro sekunder HIGH
-    if (maalNieavu(HIGH, 100) < 0) {
-        return DHTstatus::NoResponse; // vent på at sensoren trækker linjen LOW
+    delay(20); // Databladet til DHT11 kræver at pinen bliver holdt low i mindst 18 micros og maks 30 micros
+    pinMode(DHT_PIN, INPUT_PULLUP);   // Sætter til indgang så Arduino kan lytte, og pull-up trækker linjen HIGH så sensoren kan svare
+    
+    
+    // Sensorens svar: ca. 20-40 micros HIGH -> 80 micros LOW -> 80 micros HIGH
+    // Hvis en af faserne varer over 100 micros, svarer sensoren ikke
+    if (maalPulsTid(HIGH, 100) < 0) { // vent på at sensoren trækker linjen LOW
+        return DHTstatus::NoResponse; 
     }
-    if (maalNieavu(LOW,  100) < 0) {
+    if (maalPulsTid(LOW,  100) < 0) {
         return DHTstatus::NoResponse; // sensorens 80 mikro sekunder LOW-svar
     }
-    if (maalNieavu(HIGH, 100) < 0) {
+    if (maalPulsTid(HIGH, 100) < 0) {
         return DHTstatus::NoResponse; // sensorens 80 mikro sekunder HIGH-svar
     }
 
     // læs 40 bits
     for (uint8_t i = 0; i < 40; i++) {
-        if (maalNieavu(LOW, 80) < 0) {
+        if (maalPulsTid(LOW, 80) < 0) {
             return DHTstatus::BitTimeout;  // Timedout
         }
 
-
-        const int highTid = maalNieavu(HIGH, 100);
+        // Mængden af tid som den måler HIGH i
+        const int highTid = maalPulsTid(HIGH, 100);
         if (highTid < 0) {
             return DHTstatus::BitTimeout; // Timedout
         }
 
-        // Tjekker, om den målte tid for den høje puls (highTid) er længere end en fastsat grænseværdi i mikrosekunder (BIT_THRESHOLD_US)
+        // Tjekker, om den målte tid for den høje puls (highTid) er længere end en fastsat grænseværdi i mikrosekunder (40)
         // uint8_t er samme størelse som 1 byte eller 8 bit, hvilket er det jeg for svaret i fra måleren
         uint8_t bit;
-        if (highTid > BIT_THRESHOLD_MCS) {
+        if (highTid > 40) {
             bit = true;
         } else {
             bit = false;
@@ -119,8 +125,10 @@ static DHTstatus laesDHT(DHTdata &out) {
      * for både fugtighed og temperatur.
      * DHT11'ens data format er følgende 8bit integral RH data + 8bit decimal RH data + 8bit integral T data
      * + 8bit decimal T data + 8bit check sum */
-    if (sum != data[4]) return DHTstatus::ChecksumError; // Tjekker om checksum dataen er der, hvis ikke så er der fejl i dataen
-
+    if (sum != data[4]) {
+        return DHTstatus::ChecksumError; // Tjekker om checksum dataen er der, hvis ikke så er der fejl i dataene
+    }
+    
     // Find fugtigheden og lig det ind i structen
     uint8_t fugt = data[0];    // heltalsdel
     uint8_t fugtDec = data[1]; // decimaldel
@@ -163,14 +171,16 @@ void setup() {
 }
 
 void loop() {
-    static uint32_t sidst_laest = 0;
-
-    if (millis() - sidst_laest < LAES_INTERVAL_MS) {
+    // Timer for DHT sensor, sensoren kan ikke læses mere end 1 gang pr sekund
+    // Timeren sørger også for at interrupt virker 
+    static uint32_t sidste_laesning_ms = 0;
+    uint32_t nu = millis();
+    if (nu - sidste_laesning_ms < LAES_INTERVAL_MS) {
         return;
     }
-    sidst_laest = millis();
+    sidste_laesning_ms = nu;
 
-    DHTdata reading = {0}; // sætter alle værdier i structen til 0 så den køre om igen
+    DHTdata reading = {0}; // nulstil alle felter, så der ikke er gamle/tilfældige værdier
     const DHTstatus laestStatus = laesDHT(reading);
 
     // Tjek
@@ -188,13 +198,13 @@ void loop() {
     }
 
     if (visTemp) {
-        Serial.print("Viser temperatur målinger\r\n");
+        Serial.println("Viser temperatur målinger");
         // find temperaturen
         Serial.print("Temperatur: ");
         Serial.print(reading.Temperatur);
         Serial.print(" C\r\n");
     } else {
-        Serial.print("Viser fugtigheds målinger\r\n");
+        Serial.println("Viser fugtigheds målinger");
         //En DHT11 måler luftfugtighed ved at registrere ændringer i den elektriske modstand i et fugtabsorberende materiale
         // find luftfugtighede
         Serial.print("Fugtighed: ");
