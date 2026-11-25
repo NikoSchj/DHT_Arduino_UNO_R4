@@ -6,8 +6,8 @@
 #include <Arduino_LED_Matrix.h>
 #include <ArduinoGraphics.h>
 
-const int DHT_PIN = 7;                // 'Data' eller 'sig' på DHT. DHT11's DATA-pin er forbundet til D7
-const uint32_t LAES_INTERVAL_MS = 2000;   // DHT11: max omkring 1 læsning pr sekund, står i databladet
+const int DHT_PIN = 7;                // 'Data' eller 'sig' på DHT. DHT's DATA-pin er forbundet til D7
+const uint32_t LAES_INTERVAL_MS = 2000;   // DHT har et max på omkring 1 læsning pr sekund, det står i databladet
 const int KNAP_PIN = 8;                   // Pinnen til knappen
 volatile bool visTemp = true;             // Til knappens stadie
 volatile uint32_t sidstTrykket = 0;       // Bruges til debounce
@@ -29,7 +29,7 @@ enum class DHTstatus {
     ChecksumError    // alle bits modtaget men dataen er korrupt
 };
 
-// Switch case statement til status af DHT11 sensoren
+// Switch case statement til status af DHT sensoren
 static const char *status (DHTstatus s) {
     switch (s) {
         case DHTstatus::OK : return "OK";                                         // værdien OK, som hører til DHTstatus
@@ -40,7 +40,7 @@ static const char *status (DHTstatus s) {
     return "ukendt"; // Nås kun hvis enum får en ny værdi, som switch case statmentet ikke dækker
 }
 
-// Struct der indeholder data fra DHT11 sensor
+// Struct der indeholder data fra DHT sensor
 struct DHTdata {
     uint8_t bytes[5];
     float Fugtighed;        // %RH, betyder Relative Humidity
@@ -65,13 +65,13 @@ static int maalPulsTid(bool level, uint32_t timeoutMcs) {
     return (int)(micros() - start);
 }
 
-// Funktionen der køre DHT11 sensoren
+// Funktionen der køre DHT sensoren
 static DHTstatus laesDHT(DHTdata &out) {
     uint8_t data[5] = {0, 0, 0, 0, 0};
 
-    pinMode(DHT_PIN, OUTPUT);         // Sender start signal til DHT11
+    pinMode(DHT_PIN, OUTPUT);         // Sender start signal til DHT
     digitalWrite(DHT_PIN,LOW);
-    delay(20); // Databladet til DHT11 kræver at pinen bliver holdt low i mindst 18 micros og maks 30 micros
+    delay(20); // Databladet til DHT kræver at pinen bliver holdt low i mindst 18 micros og maks 30 micros
     pinMode(DHT_PIN, INPUT_PULLUP);   // Sætter til indgang så Arduino kan lytte, og pull-up trækker linjen HIGH så sensoren kan svare
     
     
@@ -87,7 +87,7 @@ static DHTstatus laesDHT(DHTdata &out) {
         return DHTstatus::NoResponse; 
     }
 
-    // læs 40 bits
+    // læs 40 bits som kommer fra DHT 8bit integral RH data + 8bit decimal RH data + 8bit integral T data  + 8bit decimal T data + 8bit check sum
     for (uint8_t i = 0; i < 40; i++) {
         if (maalPulsTid(LOW, 80) < 0) {
             return DHTstatus::BitTimeout;  // Timedout
@@ -121,9 +121,9 @@ static DHTstatus laesDHT(DHTdata &out) {
         out.bytes[i] = data[i];
     }
 
-    /* Datasheetet for DHT11 beskriver at dataene bliver givet som en heltals og en decimal del
+    /* Datasheetet for DHT11/22 beskriver at dataene bliver givet som en heltals og en decimal del
      * for både fugtighed og temperatur.
-     * DHT11'ens data format er følgende 8bit integral RH data + 8bit decimal RH data + 8bit integral T data
+     * DHT'ens data format er følgende 8bit integral RH data + 8bit decimal RH data + 8bit integral T data
      * + 8bit decimal T data + 8bit check sum */
     if (sum != data[4]) {
         return DHTstatus::ChecksumError; // Tjekker om checksum dataen er der, hvis ikke så er der fejl i dataene
@@ -163,10 +163,10 @@ void setup() {
     }
     pinMode(KNAP_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(KNAP_PIN), knapValg, FALLING);
-    // DHT11 sensor start up
+    // DHT sensor start up
     pinMode(DHT_PIN, INPUT_PULLUP);
     delay(1000);   // sensor har brug for 1 sek efter start up før den kan læse
-    Serial.println("DHT11 startede!");
+    Serial.println("DHT sensor startede!");
     Serial.println("Starter med at vise temperatur, brug knappen til at skifte mellem temperatur og fugtighed");
 }
 
@@ -205,7 +205,7 @@ void loop() {
         Serial.print(" C\r\n");
     } else {
         Serial.println("Viser fugtigheds målinger");
-        //En DHT11 måler luftfugtighed ved at registrere ændringer i den elektriske modstand i et fugtabsorberende materiale
+        //En DHT måler luftfugtighed ved at registrere ændringer i den elektriske modstand i et fugtabsorberende materiale
         // find luftfugtighede
         Serial.print("Fugtighed: ");
         Serial.print(reading.Fugtighed);
