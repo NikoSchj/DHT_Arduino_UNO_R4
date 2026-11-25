@@ -136,7 +136,7 @@ static DHTstatus laesDHT(DHTdata &out) {
 
     // Find temperatur og lig det ind i structen
     uint8_t temp = data[2];             // heltalsdel
-    uint8_t tempDec = data[3] & 0x7F;   // decimaldel, uden fortegnsbitten
+    uint8_t tempDec = data[3] &0x7F;   // decimaldel, uden fortegnsbitten
 
     out.Temperatur = temp + tempDec / 10.0f; // ligger temperaturen samme og laver den til en float
 
