@@ -60,8 +60,7 @@ static int maalPulsTid(bool level, uint32_t timeoutMcs) {
             return -1;
         }
     }
-    // Pinnen har skiftet, returnér hvor lang tid det tog.
-    // Konverteres til int, så funktionen også kan returnere -1 ved fejl.
+    // Pinnen har skiftet og returner hvor lang tid det tog, tallet laves om til et int så den kan returnere -1 
     return (int)(micros() - start);
 }
 
