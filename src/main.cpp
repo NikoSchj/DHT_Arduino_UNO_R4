@@ -80,11 +80,11 @@ static DHTstatus laesDHT(DHTdata &out) {
     if (maalPulsTid(HIGH, 100) < 0) { // vent på at sensoren trækker linjen LOW
         return DHTstatus::NoResponse; 
     }
-    if (maalPulsTid(LOW,  100) < 0) {
-        return DHTstatus::NoResponse; // sensorens 80 mikro sekunder LOW-svar
+    if (maalPulsTid(LOW,  100) < 0) { // sensorens 80 mikro sekunder LOW-svar
+        return DHTstatus::NoResponse; 
     }
-    if (maalPulsTid(HIGH, 100) < 0) {
-        return DHTstatus::NoResponse; // sensorens 80 mikro sekunder HIGH-svar
+    if (maalPulsTid(HIGH, 100) < 0) { // sensorens 80 mikro sekunder HIGH-svar
+        return DHTstatus::NoResponse; 
     }
 
     // læs 40 bits
