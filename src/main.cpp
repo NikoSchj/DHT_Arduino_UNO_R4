@@ -158,7 +158,7 @@ void printBinary_tjek(uint8_t value) {
 void setup() {
     Serial.begin(115200);
     while (!Serial && millis() < 5000) {
-        // vent i op til 5 sekunder på serial forbindelse
+        // venter i op til 5 sekunder på serial forbindelse
     }
     pinMode(KNAP_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(KNAP_PIN), knapValg, FALLING);
@@ -204,8 +204,8 @@ void loop() {
         Serial.print(" C\r\n");
     } else {
         Serial.println("Viser fugtigheds målinger");
-        //En DHT måler luftfugtighed ved at registrere ændringer i den elektriske modstand i et fugtabsorberende materiale
-        // find luftfugtighede
+        // En DHT måler luftfugtighed ved at registrere ændringer i den elektriske modstand i et fugtabsorberende materiale
+        // find luftfugtigheden
         Serial.print("Fugtighed: ");
         Serial.print(reading.Fugtighed);
         Serial.print(" %RH\r\n"); // RH står for relative humidity, og måler procent af vanddamp i luften
