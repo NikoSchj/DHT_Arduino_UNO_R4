@@ -135,8 +135,8 @@ static DHTstatus laesDHT(DHTdata &out) {
     out.Fugtighed = fugt + fugtDec / 10.0f;
 
     // Find temperatur og lig det ind i structen
-    uint8_t temp = data[2];             // heltalsdel
-    uint8_t tempDec = data[3] &0x7F;   // decimaldel, uden fortegnsbitten
+    uint8_t temp = data[2];          // heltalsdel
+    uint8_t tempDec = data[3] &0x7F; // decimaldel, uden fortegnsbitten, så den kan vise minus grader
 
     out.Temperatur = temp + tempDec / 10.0f; // ligger temperaturen samme og laver den til en float
 
