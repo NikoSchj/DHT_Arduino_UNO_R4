@@ -47,10 +47,10 @@ struct DHTdata {
     float Temperatur;       // Grader i celcius
 };
 
-// Fungere som et stopur, starter tid, og returnere hvor langtid level blev på enten high eller low (timeoutMcs er en parameter for denne funktion: max ventetid i micros)
+// Fungere som et stopur, starter tid, og returnere hvor lang tid level blev på enten high eller low (timeoutMcs er en parameter for denne funktion: max ventetid i micros)
 static int maalPulsTid(bool level, uint32_t timeoutMcs) {
 
-    // Start stopur
+    // Starter stopuret
     const uint32_t start = micros();
 
     // Vent så længe pinnen stadig er på det målte niveau
@@ -60,7 +60,7 @@ static int maalPulsTid(bool level, uint32_t timeoutMcs) {
             return -1;
         }
     }
-    // Pinnen har skiftet og returner hvor lang tid det tog, tallet laves om til et int så den kan returnere -1 
+    // Pinnen har skiftet og returner hvor lang tid det tog, tallet laves om til et int så den kan returnere -1
     return (int)(micros() - start);
 }
 
@@ -80,10 +80,10 @@ static DHTstatus laesDHT(DHTdata &out) {
         return DHTstatus::NoResponse; 
     }
     if (maalPulsTid(LOW,  100) < 0) { // sensorens 80 mikro sekunder LOW-svar
-        return DHTstatus::NoResponse; 
+        return DHTstatus::NoResponse;
     }
     if (maalPulsTid(HIGH, 100) < 0) { // sensorens 80 mikro sekunder HIGH-svar
-        return DHTstatus::NoResponse; 
+        return DHTstatus::NoResponse;
     }
 
     // læs 40 bits som kommer fra DHT 8bit integral RH data + 8bit decimal RH data + 8bit integral T data  + 8bit decimal T data + 8bit check sum
@@ -182,7 +182,7 @@ void loop() {
     DHTdata reading = {0}; // nulstil alle felter, så der ikke er gamle/tilfældige værdier
     const DHTstatus laestStatus = laesDHT(reading);
 
-    // Tjek
+    // Tjek, viser de binæretal
     Serial.print("Bits: ");
     for (uint8_t i = 0; i < 5; i++) {
         printBinary_tjek(reading.bytes[i]);
